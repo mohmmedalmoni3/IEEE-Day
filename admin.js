@@ -24,7 +24,7 @@
     showDashboard();
     entries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     const query = search.value.trim().toLowerCase();
-    const filtered = entries.filter(item => [item.fullName, item.email, item.phone, item.major, item.year, item.organizationType, item.organizationName, item.attendeeCount].some(value => String(value || '').toLowerCase().includes(query)));
+    const filtered = entries.filter(item => [item.fullName, item.email, item.phone, item.major, item.year, item.organizationType, item.organizationName, item.attendeeCount, item.boothOption].some(value => String(value || '').toLowerCase().includes(query)));
     document.querySelector('#totalCount').textContent = entries.length.toLocaleString('ar-JO');
     document.querySelector('#majorCount').textContent = new Set(entries.map(item => item.major).filter(Boolean)).size.toLocaleString('ar-JO');
     const last = entries[0];
@@ -33,14 +33,14 @@
     document.querySelector('#recordCount').textContent = `${entries.length.toLocaleString('ar-JO')} سجل`;
     document.querySelector('#tableSummary').textContent = `عرض ${filtered.length.toLocaleString('ar-JO')} من ${entries.length.toLocaleString('ar-JO')} مسجل`;
     document.querySelector('#updatedAt').textContent = new Intl.DateTimeFormat('ar-JO', { hour: '2-digit', minute: '2-digit' }).format(new Date());
-    table.innerHTML = filtered.map(item => `<tr><td><div class="student-cell"><span class="student-avatar">${esc((item.fullName || '؟').trim().charAt(0))}</span><span><b>${esc(item.fullName)}</b><small>طلب تسجيل</small></span></div></td><td dir="ltr" class="ltr-cell">${esc(item.phone)}</td><td dir="ltr" class="ltr-cell">${esc(item.email)}</td><td><span class="major-tag">${esc(item.major)}</span></td><td>${esc(item.year)}</td><td>${esc(item.organizationType)}</td><td>${esc(item.organizationName)}</td><td>${esc(item.attendeeCount)}</td><td>${esc(dateLabel(item.createdAt))}</td></tr>`).join('');
+    table.innerHTML = filtered.map(item => `<tr><td><div class="student-cell"><span class="student-avatar">${esc((item.fullName || '؟').trim().charAt(0))}</span><span><b>${esc(item.fullName)}</b><small>طلب تسجيل</small></span></div></td><td dir="ltr" class="ltr-cell">${esc(item.phone)}</td><td dir="ltr" class="ltr-cell">${esc(item.email)}</td><td><span class="major-tag">${esc(item.major)}</span></td><td>${esc(item.year)}</td><td>${esc(item.organizationType)}</td><td>${esc(item.organizationName)}</td><td>${esc(item.attendeeCount)}</td><td>${esc(item.boothOption)}</td><td>${esc(dateLabel(item.createdAt))}</td></tr>`).join('');
     emptyState.hidden = entries.length > 0;
     noResults.hidden = entries.length === 0 || filtered.length > 0;
     document.querySelector('#exportCsv').onclick = () => exportCsv(entries);
   }
   function exportCsv(entries) {
     if (!entries.length) { document.querySelector('#exportCsv').classList.add('export-empty'); setTimeout(() => document.querySelector('#exportCsv').classList.remove('export-empty'), 1800); return; }
-    const rows = [['الاسم الرباعي لمسؤول الفرع / المجتمع', 'رقم الهاتف', 'البريد الإلكتروني', 'التخصص', 'السنة الدراسية', 'نوع الجهة', 'اسم الجهة', 'عدد الحضور المتوقع', 'تاريخ التسجيل'], ...entries.map(item => [item.fullName, item.phone, item.email, item.major, item.year, item.organizationType, item.organizationName, item.attendeeCount, item.createdAt])];
+    const rows = [['الاسم الرباعي لمسؤول الفرع / المجتمع', 'رقم الهاتف', 'البريد الإلكتروني', 'التخصص', 'السنة الدراسية', 'نوع الجهة', 'اسم الجهة', 'عدد الحضور المتوقع', 'حالة البوث', 'تاريخ التسجيل'], ...entries.map(item => [item.fullName, item.phone, item.email, item.major, item.year, item.organizationType, item.organizationName, item.attendeeCount, item.boothOption, item.createdAt])];
     const csv = '\ufeff' + rows.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url; link.download = `registrants-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);

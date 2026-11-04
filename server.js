@@ -141,7 +141,7 @@ function normalizePhone(value) {
 
 function cleanRegistration(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { error: 'request' };
-  for (const key of ['fullName', 'phone', 'email', 'major', 'year', 'organizationType', 'organizationName']) {
+  for (const key of ['fullName', 'phone', 'email', 'major', 'year', 'organizationType', 'organizationName', 'boothOption']) {
     if (typeof input[key] !== 'string') return { error: key };
   }
   const fullName = input.fullName.trim().replace(/\s+/g, ' ');
@@ -151,6 +151,7 @@ function cleanRegistration(input) {
   const year = input.year.trim();
   const organizationType = input.organizationType.trim();
   const organizationName = input.organizationName.trim();
+  const boothOption = input.boothOption.trim();
   const attendeeCount = typeof input.attendeeCount === 'number' ? input.attendeeCount : NaN;
   if (fullName.split(' ').length < 4 || fullName.length > 160) return { error: 'fullName' };
   if (!/^07[789]\d{7}$/.test(phone)) return { error: 'phone' };
@@ -159,9 +160,10 @@ function cleanRegistration(input) {
   if (!year || year.length > 80) return { error: 'year' };
   if (!['فرع', 'مجتمع'].includes(organizationType)) return { error: 'organizationType' };
   if (!organizationName || organizationName.length > 160) return { error: 'organizationName' };
+  if (!['مع بوث', 'بدون بوث'].includes(boothOption)) return { error: 'boothOption' };
   if (!Number.isInteger(attendeeCount) || attendeeCount < 1 || attendeeCount > 10000) return { error: 'attendeeCount' };
   if (input.consent !== true) return { error: 'consent' };
-  return { value: { fullName, phone, email, major, year, organizationType, organizationName, attendeeCount } };
+  return { value: { fullName, phone, email, major, year, organizationType, organizationName, attendeeCount, boothOption } };
 }
 
 async function initDatabase() {
@@ -176,18 +178,26 @@ async function initDatabase() {
     organization_type TEXT NOT NULL DEFAULT 'فرع',
     organization_name TEXT NOT NULL DEFAULT '',
     attendee_count INTEGER NOT NULL DEFAULT 1,
+    booth_option TEXT NOT NULL DEFAULT 'بدون بوث',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
   await queryWithRetry('ALTER TABLE registrants ADD COLUMN IF NOT EXISTS device_hash TEXT');
   await queryWithRetry("ALTER TABLE registrants ADD COLUMN IF NOT EXISTS organization_type TEXT NOT NULL DEFAULT 'فرع'");
   await queryWithRetry("ALTER TABLE registrants ADD COLUMN IF NOT EXISTS organization_name TEXT NOT NULL DEFAULT ''");
   await queryWithRetry('ALTER TABLE registrants ADD COLUMN IF NOT EXISTS attendee_count INTEGER NOT NULL DEFAULT 1');
+  await queryWithRetry("ALTER TABLE registrants ADD COLUMN IF NOT EXISTS booth_option TEXT NOT NULL DEFAULT 'بدون بوث'");
   await queryWithRetry(`DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'registrants'::regclass AND conname = 'registrants_attendee_count_range') THEN
       ALTER TABLE registrants ADD CONSTRAINT registrants_attendee_count_range CHECK (attendee_count BETWEEN 1 AND 10000) NOT VALID;
     END IF;
   END $$`);
   await queryWithRetry('ALTER TABLE registrants VALIDATE CONSTRAINT registrants_attendee_count_range');
+  await queryWithRetry(`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'registrants'::regclass AND conname = 'registrants_booth_option_valid') THEN
+      ALTER TABLE registrants ADD CONSTRAINT registrants_booth_option_valid CHECK (booth_option IN ('مع بوث', 'بدون بوث')) NOT VALID;
+    END IF;
+  END $$`);
+  await queryWithRetry('ALTER TABLE registrants VALIDATE CONSTRAINT registrants_booth_option_valid');
   await queryWithRetry('CREATE UNIQUE INDEX IF NOT EXISTS registrants_email_unique ON registrants (LOWER(email))');
   await queryWithRetry('CREATE UNIQUE INDEX IF NOT EXISTS registrants_device_hash_unique ON registrants (device_hash) WHERE device_hash IS NOT NULL');
 }
@@ -239,7 +249,7 @@ async function handler(req, res) {
     if (req.method === 'POST' && url.pathname === '/api/admin/logout') return json(res, 200, { authenticated: false }, { 'Set-Cookie': cookie('', 0) });
     if (url.pathname.startsWith('/api/admin/') && !validSession(req)) return json(res, 401, { error: 'unauthorized', message: 'يرجى تسجيل الدخول للوصول إلى لوحة الإدارة.' });
     if (req.method === 'GET' && url.pathname === '/api/admin/registrants') {
-      const result = await queryWithRetry('SELECT id, full_name AS "fullName", phone, email, major, study_year AS year, organization_type AS "organizationType", organization_name AS "organizationName", attendee_count AS "attendeeCount", created_at AS "createdAt" FROM registrants ORDER BY created_at DESC LIMIT 10000');
+      const result = await queryWithRetry('SELECT id, full_name AS "fullName", phone, email, major, study_year AS year, organization_type AS "organizationType", organization_name AS "organizationName", attendee_count AS "attendeeCount", booth_option AS "boothOption", created_at AS "createdAt" FROM registrants ORDER BY created_at DESC LIMIT 10000');
       return json(res, 200, { registrants: result.rows });
     }
     if (req.method === 'POST' && url.pathname === '/api/register') {
@@ -248,13 +258,13 @@ async function handler(req, res) {
       const input = await bodyJson(req);
       const cleaned = cleanRegistration(input);
       if (cleaned.error) return json(res, 400, { error: 'validation_error', field: cleaned.error, message: 'يرجى مراجعة البيانات المطلوبة.' });
-      const { fullName, phone, email, major, year, organizationType, organizationName, attendeeCount } = cleaned.value;
+      const { fullName, phone, email, major, year, organizationType, organizationName, attendeeCount, boothOption } = cleaned.value;
       const deviceCookie = cookies(req).hu_registration_device || '';
       const suppliedDeviceId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(input.deviceId || '')) ? String(input.deviceId).toLowerCase() : '';
       const deviceId = deviceCookie || suppliedDeviceId || crypto.randomBytes(32).toString('base64url');
       const deviceHash = crypto.createHash('sha256').update(deviceId).digest('hex');
       try {
-        const result = await queryWithRetry('INSERT INTO registrants (full_name, phone, email, device_hash, major, study_year, organization_type, organization_name, attendee_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at AS "createdAt"', [fullName, phone, email, deviceHash, major, year, organizationType, organizationName, attendeeCount]);
+        const result = await queryWithRetry('INSERT INTO registrants (full_name, phone, email, device_hash, major, study_year, organization_type, organization_name, attendee_count, booth_option) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, created_at AS "createdAt"', [fullName, phone, email, deviceHash, major, year, organizationType, organizationName, attendeeCount, boothOption]);
         const headers = deviceCookie ? {} : { 'Set-Cookie': registrationDeviceCookie(deviceId) };
         return json(res, 201, { registered: true, id: result.rows[0].id, createdAt: result.rows[0].createdAt }, headers);
       } catch (error) {
