@@ -54,7 +54,9 @@
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return 'أدخل بريداً إلكترونياً صحيحاً.';
       if (allEntries.some(entry => entry.email.toLowerCase() === email)) return 'هذا البريد مسجّل مسبقاً.';
     }
-    if (['major', 'year'].includes(input.name) && !value) return 'يرجى اختيار ' + (input.name === 'major' ? 'التخصص.' : 'السنة الدراسية.');
+    if (['major', 'year', 'organizationType'].includes(input.name) && !value) return 'يرجى اختيار ' + ({ major: 'التخصص.', year: 'السنة الدراسية.', organizationType: 'نوع الجهة.' }[input.name]);
+    if (input.name === 'organizationName' && (!value || value.length > 160)) return value ? 'اسم الجهة طويل جداً.' : 'يرجى إدخال اسم الجهة.';
+    if (input.name === 'attendeeCount' && (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 10000)) return 'أدخل عدد حضور صحيحاً بين 1 و10000.';
     return '';
   };
   const validate = (field, entries) => mark(field, errorFor(field.querySelector('input,select'), entries));
@@ -79,7 +81,7 @@
       return;
     }
     const data = Object.fromEntries(new FormData(form).entries());
-    const entry = { fullName: data.fullName.trim().replace(/\s+/g, ' '), phone: normalizePhone(data.phone), email: data.email.trim().toLowerCase(), major: data.major, year: data.year, consent: true, deviceId: getDeviceId() };
+    const entry = { fullName: data.fullName.trim().replace(/\s+/g, ' '), phone: normalizePhone(data.phone), email: data.email.trim().toLowerCase(), major: data.major, year: data.year, organizationType: data.organizationType, organizationName: data.organizationName.trim(), attendeeCount: Number(data.attendeeCount), consent: true, deviceId: getDeviceId() };
     const submitButton = form.querySelector('.submit-button');
     submitButton.disabled = true;
     submitButton.querySelector('.submit-text').textContent = 'جارٍ حفظ التسجيل…';

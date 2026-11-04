@@ -133,3 +133,14 @@ body.event-body{background:#f3f7fc;color:#15263c;font-family:"Cairo",sans-serif}
 /* Keep registration as the primary action, followed by event information. */
 .event-registration-panel{order:-1}
 .event-intro{order:0}
+
+/* Conference agenda and organization attendance fields */
+.event-intro{align-self:stretch;display:flex;flex-direction:column;justify-content:center}
+.conference-program{position:relative;z-index:1;margin-top:20px;padding:17px 18px;border:1px solid rgba(255,255,255,.2);border-radius:16px;background:rgba(3,35,82,.29);backdrop-filter:blur(8px)}
+.conference-program h2{margin:0 0 8px;color:#fff;font:700 16px/1.5 Cairo,sans-serif}
+.program-opening{margin:0;color:#e2edfa;font:400 11px/1.85 Cairo,sans-serif}
+.conference-program ol{display:grid;gap:8px;margin:13px 0 0;padding:0;list-style:none}
+.conference-program li{display:flex;align-items:flex-start;gap:9px;color:#edf5ff;font:400 10px/1.75 Cairo,sans-serif}
+.conference-program li>b{display:grid;flex:0 0 23px;height:23px;place-items:center;border:1px solid rgba(255,177,110,.65);border-radius:7px;color:#ffb16e;font:700 9px Arial,sans-serif}
+.conference-program li strong{color:#ffbd82;font:700 9px Arial,sans-serif;letter-spacing:.03em}
+@media(max-width:760px){.conference-program{margin-top:16px;padding:15px}.conference-program h2{font-size:15px}.program-opening{font-size:10px}.conference-program ol{gap:7px}.conference-program li{font-size:10px}}
